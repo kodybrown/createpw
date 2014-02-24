@@ -25,24 +25,24 @@ JUST be sure that you are consistent in supplying a user name with keys or not.
 Here are a couple of examples:
 
 ```dos
-&gt; createpw amazon.com
+> createpw amazon.com
 Enter the username:         user
 Enter the master password:  ********
 
-password = &lt;put into clipboard&gt;
+password = <put into clipboard>
 ```
 
 ```dos
-&gt; createpw
+> __createpw__
 Enter the site name or key: amazon.com
 Enter the username:         user
 Enter the master password:  ********
 
-password = &lt;put into clipboard&gt;
+password = <put into clipboard>
 ```
 
 ```dos
-&gt; createpw --no-clip
+> createpw --no-clip
 Enter the site name or key: amazon.com
 Enter the username:         user
 Enter the master password:  ********
