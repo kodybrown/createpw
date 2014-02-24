@@ -33,7 +33,7 @@ password = <put into clipboard>
 ```
 
 ```dos
-> __createpw__
+> createpw
 Enter the site name or key: amazon.com
 Enter the username:         user
 Enter the master password:  ********
