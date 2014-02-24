@@ -87,6 +87,10 @@ namespace createpw
 				}
 			}
 
+			if (!quiet) {
+				header();
+			}
+
 			if (site.Length == 0) {
 				Console.Write("Enter the site name or key: ");
 				if (!ConsoleText.ReadLine(out site, left: Console.CursorLeft, maxlength: 40, echo: true) || site.Length == 0) {
@@ -178,10 +182,36 @@ namespace createpw
 			return 0;
 		}
 
+		static void header()
+		{
+			Console.WriteLine(@"createpw.exe | Copyright (C) 2014 @wasatchwizard
+");
+		}
+
 		static void usage()
 		{
-			Console.WriteLine("createpw.exe <key|site-name>");
-			Console.WriteLine();
+			header();
+			Console.WriteLine(@"SYNOPSIS:
+
+  A simple utility to create unique passwords from a key (such as a 
+  website name) and a master password. The idea for the code came from 
+  http://ss64.com/pass/.
+
+USAGE: createpw.exe [options] [key|site-name]
+
+  key|site-name      Any unique key that you will remember.
+                     If you’re using this for a website, put in
+                     the url (such as: amazon or amazon.com).
+                     If omitted, you will be prompted for it.
+
+OPTIONS:
+
+  --no-symbols       Do not output symbols in the new password.
+                     By default, symbols (ie: $#@!, etc.) are output.
+
+  --clip             Put the newly created password onto the clipboard.
+                     This is the default behavior.
+  --no-clip          Output the new password to the console.");
 		}
 
 		static string getSHA256( string password )

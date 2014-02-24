@@ -22,7 +22,7 @@ The idea for the code came from [ss64.com](http://ss64.com/pass/).
 When it asks for the user name, you can just press enter to bypass/skip it.
 JUST be sure that you are consistent in supplying a user name with keys or not.
 
-Here are a couple of examples:
+Here are a few of examples:
 
 ```dos
 > createpw amazon.com
