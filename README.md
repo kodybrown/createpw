@@ -29,7 +29,8 @@ Here are a couple of examples:
 Enter the username:         user
 Enter the master password:  ********
 
-password = &lt;put into clipboard&gt;```
+password = &lt;put into clipboard&gt;
+```
 
 ```dos
 &gt; createpw
@@ -37,7 +38,8 @@ Enter the site name or key: amazon.com
 Enter the username:         user
 Enter the master password:  ********
 
-password = &lt;put into clipboard&gt;```
+password = &lt;put into clipboard&gt;
+```
 
 ```dos
 &gt; createpw --no-clip
@@ -45,6 +47,7 @@ Enter the site name or key: amazon.com
 Enter the username:         user
 Enter the master password:  ********
 
-password = #ZJ~EEUmXuYVdMEMUK7CVbgxqY```
+password = #ZJ~EEUmXuYVdMEMUK7CVbgxqY
+```
 
 I typed `12345678` for the passwords. In the last example, you should get the same result!
