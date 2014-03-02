@@ -1,7 +1,9 @@
 ﻿using System;
+using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Forms;
+using Bricksoft.PowerCode;
 
 namespace createpw
 {
@@ -11,18 +13,31 @@ namespace createpw
 		static bool quiet = false;
 		static bool verbose = false;
 
+		static bool useCache = false;
+		static bool cachePw = false;
+
 		[STAThreadAttribute]
 		static int Main( string[] args )
 		{
+			Config config = new Config();
 			string site = "",
 				password = "",
-				username = "";
+				username = "",
+				cachefile = "";
 			//bool allowalpha = true,
 			//	allowdigits = true,
 			//	allowsymbols = true;
 			bool addsymbols = true;
 			bool setclip = true;
+			bool fl_config = false;
 			int passlen = 26;
+
+			config.read(true);
+			if (config.contains("cachefile")) {
+				cachefile = config.attr<string>("cachefile");
+			} else {
+				cachefile = "createpw.enc";
+			}
 
 			for (int i = 0; i < args.Length; i++) {
 				string a = args[i];
@@ -42,12 +57,46 @@ namespace createpw
 						usage();
 						return 0;
 
-					} else if (al.StartsWith("p") || al.StartsWith("!p") || al.StartsWith("nop") || al.StartsWith("no-p")) {
-						pause = al.StartsWith("p");
+					} else if (al.Equals("pause") || al.Equals("!pause") || al.Equals("nopause") || al.Equals("no-pause")) {
+						pause = al.Equals("pause");
 					} else if (al.StartsWith("q") || al.StartsWith("!q") || al.StartsWith("noq") || al.StartsWith("no-q")) {
 						quiet = al.StartsWith("q");
 					} else if (al.StartsWith("v") || al.StartsWith("!v") || al.StartsWith("nov") || al.StartsWith("no-v")) {
 						verbose = al.StartsWith("v");
+
+					} else if (al.Equals("config")) {
+						fl_config = true;
+
+					} else if (al.StartsWith("cache") || al.StartsWith("!cache") || al.Equals("nocache") || al.Equals("no-cache")) {
+						useCache = al.StartsWith("cache");
+
+					} else if (al.StartsWith("p")) {
+						int j = al.IndexOfAny(new char[] { ':', '=' });
+						if (j > -1) {
+							password = a.Substring(j + 1).Trim();
+						} else {
+							if (args.Length > i) {
+								password = args[i + 1];
+							} else {
+								Console.WriteLine("Missing master password argument.");
+							}
+						}
+
+					} else if (al.StartsWith("len") || al.StartsWith("passlen") || al.StartsWith("pass-len")) {
+						int j = al.IndexOfAny(new char[] { ':', '=' });
+						if (j > -1) {
+							if (!int.TryParse(al.Substring(j + 1).Trim(), out passlen)) {
+								Console.WriteLine("Could not parse the password length: " + args[i + 1]);
+							}
+						} else {
+							if (args.Length > i) {
+								if (!int.TryParse(args[i + 1], out passlen)) {
+									Console.WriteLine("Could not parse the password length: " + args[i + 1]);
+								}
+							} else {
+								Console.WriteLine("Missing new password length argument.");
+							}
+						}
 
 					} else if (al == "clip" || al == "noclip" || al == "no-clip") {
 						setclip = (al == "clip");
@@ -92,16 +141,21 @@ namespace createpw
 			}
 
 			if (site.Length == 0) {
-				Console.Write("Enter the site name or key: ");
-				if (!ConsoleText.ReadLine(out site, left: Console.CursorLeft, maxlength: 40, echo: true) || site.Length == 0) {
-					return 0;
+				if (quiet) {
+					Console.Write("**** ERROR: Cannot ask for user input (site) when --quiet is specified. exiting.");
+					return 100;
+				} else {
+					Console.Write("Enter the site name or key: ");
+					if (!ConsoleText.ReadLine(out site, left: Console.CursorLeft, maxlength: 40, echo: true) || site.Length == 0) {
+						return 0;
+					}
 				}
 			}
 			//if (verbose) {
 			//	Console.WriteLine("using '" + site + "'");
 			//}
 
-			if (username.Length == 0) {
+			if (username.Length == 0 && !quiet) {
 				Console.Write("Enter the username:         ");
 				if (!ConsoleText.ReadLine(out username, left: Console.CursorLeft, maxlength: 40, echo: true)) {
 					return 0;
@@ -115,33 +169,78 @@ namespace createpw
 			//	}
 			//}
 
-			Console.Write("Enter the master password:  ");
-			if (!ConsoleText.ReadLine(out password, left: Console.CursorLeft, maxlength: 40, echo: true, passwd: true) || site.Length == 0) {
-				return 0;
+			string tmp = "",
+				hash = "",
+				passhash = "",
+				base64 = "",
+				file_dthash = "",
+				read_dthash = "";
+
+			if (useCache) {
+				// Use the last password that was used.
+				if (File.Exists(cachefile)) {
+					tmp = File.ReadAllText(cachefile);
+					// line 1 is a hash of the file's last written date/time.
+					// line 2 is the actual password hash.
+					read_dthash = tmp.Substring(0, tmp.IndexOf('\n')).Trim();
+					file_dthash = getSHA256(File.GetLastWriteTimeUtc(cachefile).ToString("YYYY-MM-DD:HH:NN:SS")).Trim();
+					if (read_dthash == file_dthash) {
+						passhash = tmp.Substring(tmp.IndexOf('\n')).Trim();
+					} else {
+						// Invalid signature on file!
+						File.SetAttributes(cachefile, FileAttributes.Normal);
+						File.Delete(cachefile);
+						passhash = "";
+					}
+				}
 			}
-			//Console.WriteLine("using '" + password + "'");
 
-			Console.WriteLine();
+			if (passhash.Length == 0 && password.Length == 0) {
+				if (quiet) {
+					Console.Write("**** ERROR: Cannot ask for user input (master password) when --quiet is specified. exiting.");
+					return 101;
+				} else {
+					if (useCache) {
+						Console.WriteLine("The master password has not yet been cached.");
+						cachePw = true;
+					}
+					Console.Write("Enter the master password:  ");
+					if (!ConsoleText.ReadLine(out password, left: Console.CursorLeft, maxlength: 40, echo: true, passwd: true) || site.Length == 0) {
+						return 51;
+					}
+				}
+			}
 
-			// echo -n "$key:$1" | sha256sum | perl -ne "s/([0-9a-f]{2})/print chr hex \$1/gie" | base64 | tr +/ Ea | cut -b 1-20
-			string hash, base64;
+			if (!quiet) {
+				Console.WriteLine();
+			}
 
-			hash = getSHA256(password + ":" + site + ":" + username);
-			if (verbose) {
+			if (passhash.Length == 0) {
+				passhash = getSHA256(password);
+			}
+
+			if (cachePw) {
+				// Save the new password (as a hash) into the cachefile.
+				DateTime n = DateTime.Now.ToUniversalTime();
+				file_dthash = getSHA256(n.ToString("YYYY-MM-DD:HH:NN:SS"));
+				File.WriteAllText(cachefile, file_dthash + "\n" + passhash);
+				File.SetLastWriteTimeUtc(cachefile, n);
+			}
+
+			hash = getSHA256(passhash + ":" + site + ":" + username);
+			if (verbose && !quiet) {
 				Console.WriteLine("hash1    = " + hash);
 			}
 
 			SHA256Managed crypt = new SHA256Managed();
-			//SHA512Managed crypt = new SHA512Managed();
 			byte[] crypto = crypt.ComputeHash(Encoding.UTF8.GetBytes(hash), 0, Encoding.UTF8.GetByteCount(hash));
 
 			base64 = Convert.ToBase64String(crypto, Base64FormattingOptions.None);
-			if (verbose) {
+			if (verbose && !quiet) {
 				Console.WriteLine("base64   = " + base64);
 			}
 
 			if (addsymbols) {
-				//base64 = base64.Replace("+", "$").Replace("/", "*");
 				char[] ca = new char[] { '~', '!', '@', '#', '$', '%', '^', '&', '*', '(' };
 				int index = 0;
 				char[] ba = base64.ToCharArray();
@@ -151,7 +250,7 @@ namespace createpw
 
 				for (int i = 0; i < ba.Length; i++) {
 					char c = ba[i];
-					if (!c.isalpha() && !c.isdigit()) {
+					if (c == 'o' || c == '1' || c == 'l' || (!c.isalpha() && !c.isdigit())) {
 						s.Append(ca[index++]);
 						if (index > ca.Length - 1) {
 							index = 0;
@@ -166,16 +265,21 @@ namespace createpw
 				base64 = base64.Replace("+", "E").Replace("/", "a");
 			}
 
-			base64 = base64.Substring(0, passlen);
+			if (base64.Length >= passlen) {
+				base64 = base64.Substring(0, passlen);
+			}
 
 			if (setclip) {
 				Clipboard.SetText(base64, TextDataFormat.Text);
-				Console.WriteLine("password = <put into clipboard>");
-			} else {
-				Console.WriteLine("password = " + base64);
 			}
 
-			if (pause) {
+			if (!quiet) {
+				Console.WriteLine();
+				Console.WriteLine("password = " + base64);
+				Console.WriteLine();
+			}
+
+			if (!quiet && pause) {
 				Console.ReadKey(true);
 			}
 
@@ -205,6 +309,10 @@ USAGE: createpw.exe [options] [key|site-name]
                      If omitted, you will be prompted for it.
 
 OPTIONS:
+
+  --pause
+  --quiet
+  --verbose
 
   --no-symbols       Do not output symbols in the new password.
                      By default, symbols (ie: $#@!, etc.) are output.
